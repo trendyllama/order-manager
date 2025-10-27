@@ -1,14 +1,34 @@
 
+from models import Base
+from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
-class OrderManagementEngine:
+class DbEngineService:
     pass
 
+class OrderManagementEngine:
+
+    def __init__(self, engine: Engine):
+
+        self.db_engine = engine
 
 
-def main():
+    def start(self):
 
-    print("Hello from order-manager!")
+        with self.db_engine.begin() as conn:
+            Base.metadata.create_all(conn)
+
+    def pause(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def restart(self):
+        pass
+
+    def shutdown(self):
+        pass
 
 
-if __name__ == "__main__":
-    main()
+
