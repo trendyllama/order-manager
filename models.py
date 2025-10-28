@@ -11,7 +11,7 @@ class Client(Base):
     __tablename__ = "clients"
 
     acronym: Mapped[str] = mapped_column(primary_key=True)
-    full_name: Mapped[str]
+    full_name: Mapped[str] = mapped_column()
 
 class Order(Base):
     __tablename__ = "orders"
@@ -24,6 +24,7 @@ class Order(Base):
     filled_time: Mapped[datetime.datetime | None] = mapped_column()
     client: Mapped[str] = mapped_column(sa.ForeignKey(Client.acronym))
     received_event_id: Mapped[int] = mapped_column(primary_key=True)
+    filled_quantity: Mapped[int | None] = mapped_column()
 
 
 class Exchange(Base):

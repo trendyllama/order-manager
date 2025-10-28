@@ -147,10 +147,109 @@ def test_order_filled(session: Session):
     # Update order to filled
     order.state = "filled"
     order.filled_time = datetime.datetime.now()
+    order.filled_quantity = 120
     session.commit()
 
     retrieved_order = session.query(Order).filter_by(symbol="AMZN").first()
     assert retrieved_order is not None
     assert retrieved_order.state == "filled"
     assert retrieved_order.filled_time is not None
+    assert retrieved_order.filled_quantity == 120
+
+def test_partial_fill(session: Session):
+    from models import Order
+    order = Order(
+        symbol="FB",
+        quantity=100,
+        state="processed",
+        received_time=datetime.datetime.now() - datetime.timedelta(hours=2),
+        processed_time=datetime.datetime.now() - datetime.timedelta(hours=1),
+        filled_time=None,
+        client="MNO",
+        received_event_id=6,
+    )
+    session.add(order)
+    session.commit()
+
+    # Update order to partially filled
+    order.state = "partially_filled"
+    order.filled_time = datetime.datetime.now()
+    order.filled_quantity = 40
+    session.commit()
+
+    retrieved_order = session.query(Order).filter_by(symbol="FB").first()
+    assert retrieved_order is not None
+    assert retrieved_order.state == "partially_filled"
+    assert retrieved_order.filled_time is not None
+    assert retrieved_order.filled_quantity == 40
+
+    retrieved_order.filled_quantity += 60
+    retrieved_order.state = "filled"
+    session.commit()
+
+    final_order = session.query(Order).filter_by(symbol="FB").first()
+    assert final_order is not None
+    assert final_order.state == "filled"
+    assert final_order.filled_quantity == 100
+
+
+def test_many_orders_single_client(session: Session):
+    from models import Client, Order
+    client = Client(acronym="PQR", full_name="Prime Quality Resources")
+    session.add(client)
+    session.commit()
+
+    orders = [
+        Order(
+            symbol="IBM",
+            quantity=30,
+            state="received",
+            received_time=datetime.datetime.now(),
+            processed_time=None,
+            filled_time=None,
+            client="PQR",
+            received_event_id=7 + i,
+        )
+        for i in range(5)
+    ]
+    session.add_all(orders)
+    session.commit()
+
+    retrieved_orders = session.query(Order).filter_by(client="PQR").all()
+    assert len(retrieved_orders) == 5
+    for i, order in enumerate(retrieved_orders):
+        assert order.received_event_id == 7 + i
+
+def test_many_orders_different_clients(session: Session):
+    from models import Client, Order
+    clients = [
+        Client(acronym=f"C{i}", full_name=f"Client {i}") for i in range(3)
+    ]
+    session.add_all(clients)
+    session.commit()
+
+    orders = []
+    for i in range(3):
+        for j in range(2):
+            orders.append(
+                Order(
+                    symbol=f"SYM{i}{j}",
+                    quantity=10 * (j + 1),
+                    state="received",
+                    received_time=datetime.datetime.now(),
+                    processed_time=None,
+                    filled_time=None,
+                    client=f"C{i}",
+                    received_event_id=20 + i * 10 + j,
+                )
+            )
+    session.add_all(orders)
+    session.commit()
+
+    for i in range(3):
+        retrieved_orders = session.query(Order).filter_by(client=f"C{i}").all()
+        assert len(retrieved_orders) == 2
+        for j, order in enumerate(retrieved_orders):
+            assert order.symbol == f"SYM{i}{j}"
+            assert order.quantity == 10 * (j + 1)
 
